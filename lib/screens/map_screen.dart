@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_in_flutter/utils/constants/api_keys.dart';
 import 'package:google_maps_in_flutter/utils/constants/locations.dart';
 import 'package:location/location.dart';
 
@@ -34,10 +36,19 @@ class _MapScreenState extends State<MapScreen> {
   static const LatLng _sourceLocation = LatLng(23.21826, 72.642592);
   static const LatLng _destinationLocation = LatLng(23.25912, 72.653756);
 
+  /// Polylines
+  Map<PolylineId, Polyline> polylines = {};
+
   @override
   void initState() {
     super.initState();
-    getLocationUpdates();
+    getLocationUpdates().then(
+      (_) => {
+        getPolylinePoints().then((coordinates) {
+          generatePolylineFromPoints(coordinates);
+        }),
+      },
+    );
   }
 
   @override
@@ -67,6 +78,7 @@ class _MapScreenState extends State<MapScreen> {
                   position: _destinationLocation,
                 ),
               },
+              polylines: Set<Polyline>.of(polylines.values),
             ),
     );
   }
@@ -115,8 +127,57 @@ class _MapScreenState extends State<MapScreen> {
   /// Animate camera to user position
   Future<void> _cameraToPosition(LatLng position) async {
     final GoogleMapController controller = await _mapController.future;
-    CameraPosition newCameraPosition = CameraPosition(target: position, zoom: 13);
-    
+    CameraPosition newCameraPosition = CameraPosition(
+      target: position,
+      zoom: 13,
+    );
+
     controller.animateCamera(CameraUpdate.newCameraPosition(newCameraPosition));
+  }
+
+  /// Get Polyline Points
+  Future<List<LatLng>> getPolylinePoints() async {
+    List<LatLng> polylineCoordinates = [];
+    // Initialize PolylinePoints
+    PolylinePoints polylinePoints = PolylinePoints(
+      apiKey: MyAPIKeys.googleMapApiKey,
+    );
+
+    // Get route using legacy Directions API
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      request: PolylineRequest(
+        origin: PointLatLng(_sourceLocation.latitude, _sourceLocation.longitude),
+        destination: PointLatLng(_destinationLocation.latitude, _destinationLocation.longitude),
+        mode: TravelMode.driving,
+      ),
+    );
+
+    if (result.points.isNotEmpty) {
+      // Convert to LatLng for Google Maps
+      List<LatLng> polylineCoordinates = result.points
+          .map((point) => LatLng(point.latitude, point.longitude))
+          .toList();
+
+      return polylineCoordinates;
+    } else {
+      log("Error : ${result.errorMessage}");
+    }
+
+    return [];
+  }
+
+  /// make polyline from coordinates
+  Future<void> generatePolylineFromPoints(List<LatLng> points) async {
+    PolylineId polylineId = PolylineId("poly");
+    Polyline polyline = Polyline(
+      polylineId: polylineId,
+      color: Colors.black,
+      width: 8,
+      points: points,
+    );
+    
+    setState(() {
+      polylines[polylineId] = polyline;
+    });
   }
 }
