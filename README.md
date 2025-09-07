@@ -1,6 +1,6 @@
-# google_maps_in_flutter
+# Google Map in Flutter
 
-A new Flutter project.
+A Flutter application demonstrating **Google Maps integration Flutter**.
 
 ## Getting Started
 
